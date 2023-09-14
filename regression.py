@@ -1,6 +1,34 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+def gradient_descent_visualization():
+    def y_function(x):
+        return x ** 2
+
+    def y_derivative(x):
+        return 2 * x
+
+    X = np.arange(-100, 100, 1)
+    y = y_function(X)
+
+    current_pos = (80, y_function(80))
+
+    learning_rate = 0.01
+
+    prev_pos = float('inf')
+    for i in range(1000):
+        new_x = current_pos[0] - learning_rate * y_derivative(current_pos[0])
+        new_y = y_function(new_x)
+        current_pos = (new_x, new_y)
+        if abs(current_pos[0] - prev_pos) < 1e-3:
+            print(f"Converged at iteration {i}")
+            break
+        prev_pos = current_pos[0]
+        plt.plot(X,y)
+        plt.scatter(current_pos[0], current_pos[1], c='red')
+        plt.pause(0.001)
+        plt.clf()
+
 class LinearRegression():
     
     def __init__(self, learning_rate=0.001, iters=1000) -> None:
@@ -45,6 +73,8 @@ class LinearRegression():
         y_pred = np.dot(X,self.theta)
         return y_pred
 
+gradient_descent_visualization()
+'''
 X = np.array([1, 2, 3, 4, 5])
 y = np.array([2, 4, 5, 4, 5])
 
@@ -52,3 +82,4 @@ clf = LinearRegression()
 clf.fit(X,y)
 y_pred = clf.predict(X.reshape(np.size(X), -1))
 print(y_pred)
+'''
