@@ -30,172 +30,188 @@ def gradient_descent_visualization():
         plt.pause(0.001)
         plt.clf()
 
-class LinearRegression():
-    
-    def __init__(self, learning_rate=0.001, iters=1000) -> None:
+class PolynomialRegression():
+    def __init__(self, degree=None, learning_rate=0.001, epochs=50000) -> None:
+        if degree <= 0:
+            raise ValueError("Degree must be a positive number greater")
+        self.degree = degree if degree else 1
         self.learning_rate = learning_rate
-        self.iters = iters
+        self.epochs = epochs
         self.theta = None
+        self.costs = []
     
-    def fit(self, X,y, subplots=False):
-        if not isinstance(X, np.ndarray):
-            raise TypeError('"X" must be an ndarray to perform regression')
-        if not isinstance(y, np.ndarray):
-            raise TypeError('"y" must be an ndarray to perform regression')
-        if len(X.shape) == 1 or X.shape[1] > 1:
-            # X needs to be one dimensional horizontally
-            X = X.reshape((np.size(X), -1))
-        if len(y.shape) == 1 or y.shape[1] > 1:
-            # y needs to be one dimensional horizontally
-            y = y.reshape((np.size(y), -1))
-        if y.size != X.size:
-            raise TypeError('"X" and "y" must be of equal size')
-        m = X.size
-        X = np.hstack((np.ones(shape=(m, 1)), X))
-        self.theta = np.zeros((2,1))
+    def _extend_polynomial(self, X):
+        return np.hstack([X**i for i in range(1, self.degree + 1)])
+    
+    def _normalize(self, X):
+        return (X - self.mean) / self.std
+
+    def fit(self, X, y, subplots=False):
+        self.X = X
+        X = self._extend_polynomial(X)
+        self.mean = np.mean(X, axis=0)
+        self.std = np.std(X, axis=0)
+        X = self._normalize()
+
+        X = np.hstack((np.ones((X.shape[0], 1)), X))
+        
+        self.theta = np.zeros((X.shape[1], 1))
+        m, n = X.shape
         prev_cost = float('inf')
-        for i in range(self.iters):
-            y_pred = np.dot(X,self.theta)
-            cost = (1/(2*m))*np.sum(np.square(y_pred - y))
-            theta_derivative = (1/m)*np.dot(X.T, y_pred - y)
-            self.theta = self.theta - self.learning_rate * theta_derivative
-            if abs(cost - prev_cost) < 0.0001: #1e-4
-                print(f'Converged in iteration {i}')
+        self.costs = []
+
+        for epoch in range(self.epochs):
+            y_pred = np.dot(X, self.theta)
+            error = y_pred - y
+            cost = (1/(2*m) * np.sum(np.square(error)))
+            d_theta = (1/m) * np.dot(X.T, error)
+            self.theta = self.theta - self.learning_rate * d_theta
+            self.costs.append(cost)
+            if abs(prev_cost - cost) < 0.0001:
+                print(f'Converged at epoch {epoch}')
                 break
             prev_cost = cost
             if subplots:
-                plt.scatter(X[:,1],y, c='red')
-                plt.plot(X[:,1],y_pred)
-                plt.pause(0.001)
+                plt.scatter(self.X, y, c="red")
+                plt.plot(self.X, y_pred)
+                plt.pause(0.0001)
                 plt.clf()
-            
+        plt.scatter(self.X, y, c="red")
+        plt.plot(self.X, y_pred)
+        plt.show()
+
+    def plot_error_history(self):
+        plt.plot(np.arange(1,len(self.costs) + 1), self.costs)
+        plt.xlabel('Number of epochs')
+        plt.ylabel('Mean Squared Error')
+        plt.title('MSE vs Epochs')
+        plt.show()
+    
     def predict(self, X):
-        X = np.hstack((np.ones(shape=(X.size, 1)), X))
-        y_pred = np.dot(X,self.theta)
+        X = self._extend_polynomial(X)
+        X = self._normalize()
+        X = np.hstack((np.ones((X.shape[0], 1)), X))
+        y_pred = np.dot(X, self.theta)
         return y_pred
 
-class PolynomialRegression():
+def test_polynomials(X,y):
+    costs = []
+    for i in range(1,11):
+        print(f"MSE for polynomial of degree {i}.")
+        model = PolynomialRegression(degree=i)
+        model.fit(X,y)
+        print(model.costs[len(model.costs) - 1])
+        costs.append(model.costs[len(model.costs) - 1])
+        #model.plot_error_history()
+    plt.plot(np.arange(1,len(costs) + 1), costs)
+    plt.xlabel('')
+    plt.ylabel('')
+    plt.show()
+    
 
-    def __init__(self, learning_rate=0.000000005, iters=10000, degree=None) -> None:
+class LinearRegression():
+    def __init__(self, learning_rate=0.001, epochs=50000, normalization='min_max') -> None:
         self.learning_rate = learning_rate
-        self.iters = iters
+        self.epochs = epochs
         self.theta = None
-        self.degree = degree + 1
-
-    def fit(self, X,y):
-        if not isinstance(X, np.ndarray):
-            raise TypeError('"X" must be an ndarray to perform regression')
-        if not isinstance(y, np.ndarray):
-            raise TypeError('"y" must be an ndarray to perform regression')
-        if len(X.shape) == 1:
-            raise TypeError("X shall not be one-dimensional to perform polynomial regression")
-        if self.degree == None:
-            self.degree = X.shape[1]
+        self.costs = []
+        self.normalization = normalization
+    
+    def _normalize(self, X):
+        if self.normalization == 'min_max':
+            return (X - self.min) / (self.max - self.min)
         else:
-            X = np.hstack((X, np.ones((X.shape[0], self.degree - 1 - X.shape[1]))))
-        if y.shape[0] != X.shape[0]:
-            raise TypeError('"X" and "y" must be of equal size')
+            return (X - self.mean) / self.std
+    
+    def fit(self, X, y, subplots=False):
+        self.X = X
+        self.mean = np.mean(X, axis=0)
+        self.std = np.std(X, axis=0)
+        self.min = np.min(X, axis=0)
+        self.max = np.max(X, axis=0)
+        X = self._normalize(X)
+        X = np.hstack((np.ones((X.shape[0], 1)), X))
+        self.theta = np.zeros((X.shape[1], 1))
         m, n = X.shape
-        X = np.hstack((np.ones(shape=(m, 1)), X))
-        for i in range(2, self.degree):
-            X[:,i] = X[:,1]**i
-        self.theta = np.zeros((n+1,1))
         prev_cost = float('inf')
-        costs = []
-        for i in range(self.iters):
-            y_pred = np.dot(X,self.theta)
-            '''
-            if i%30 == 0:
-                print(i)
-                print("y_pred")
-                print(y_pred)
-                print("theta")
-                print(self.theta)
-            '''
-            cost = (1/(2*m))*np.sum(np.square(y_pred - y))
-            theta_derivative = (1/m)*np.dot(X.T, y_pred - y)
-            self.theta = self.theta - self.learning_rate * theta_derivative
-            costs.append(cost)
-            if i%100 == 0:
-                print("Cost:", cost)
-            if abs(cost - prev_cost) < 0.0000001: #1e-4
-                print(f'Converged in iteration {i}')
+        self.costs = []
+
+        for epoch in range(self.epochs):
+            y_pred = np.dot(X, self.theta)
+            error = y_pred - y
+            cost = (1/(2*m) * np.sum(np.square(error)))
+            d_theta = (1/m) * np.dot(X.T, error)
+            self.theta = self.theta - self.learning_rate * d_theta
+            self.costs.append(cost)
+            if abs(prev_cost - cost) < 0.001:
+                print(f'Converged at epoch {epoch}')
                 break
             prev_cost = cost
-        return costs
-            
+            if subplots and self.X.shape[1] == 1:
+                plt.scatter(self.X, y, c="red")
+                plt.plot(self.X, y_pred)
+                plt.pause(0.0001)
+                plt.clf()
+    
+        if self.X.shape[1] == 1:
+            plt.scatter(self.X, y, c="red")
+            plt.plot(self.X, y_pred)
+            plt.show()
+        
+    def plot_error_history(self):
+        plt.plot(np.arange(1,len(self.costs) + 1), self.costs)
+        plt.xlabel('Number of epochs')
+        plt.ylabel('Mean Squared Error')
+        plt.title('MSE vs Epochs')
+        plt.show()
+
     def predict(self, X):
-        X = np.hstack((np.ones(shape=(X.shape[0], 1)), X))
-        X = np.hstack((X, np.ones((X.shape[0], self.degree - X.shape[1]))))
-        for i in range(2, self.degree):
-            X[:,i] = X[:,1]**i
-        print(X)
-        print(y)
-        y_pred = np.dot(X,self.theta)
+        X = self._normalize(X)
+        X = np.hstack((np.ones((X.shape[0], 1)), X))
+        y_pred = np.dot(X, self.theta)
         return y_pred
-    
 
-class MultilinearRegression():
-    
-    def __init__(self, learning_rate=0.00000000001, iters=10000) -> None:
-        self.learning_rate = learning_rate
-        self.iters = iters
-        self.theta = None
+def preprocess_dataframe(df):
+    def onehotencode(df, column):
+        onehot = pd.get_dummies(df[column], dtype=int)
+        df.drop([column], axis=1, inplace=True)
+        df = pd.concat([df, onehot], axis=1)
+        return df.iloc[:,:-1]
+    y = (df.iloc[:,-1].values).reshape(-1,1)
+    df.drop(['Profit'], axis = 1, inplace=True)
+    df = onehotencode(df, 'State')
+    X = df.iloc[:,:].values
+    return X, y
 
-    def fit(self, X, y):
-        if not isinstance(X, np.ndarray):
-            raise TypeError('"X" must be an ndarray to perform regression')
-        if not isinstance(y, np.ndarray):
-            raise TypeError('"y" must be an ndarray to perform regression')
-        if len(X.shape) == 1:
-            raise TypeError("X shall not be one-dimensional to perform Multilinear regression")
-        m, n = X.shape
-        X = np.hstack((np.ones(shape=(X.shape[0], 1)), X))
-        self.theta = np.zeros((n+1,1))
-        for i in range(self.iters):
-            y_pred = np.dot(X,self.theta)
-            cost = (1/(2*m))*np.sum(np.square(y_pred - y))
-            theta_derivative = (1/m)*np.dot(X.T, y_pred - y)
-            self.theta = self.theta - self.learning_rate * theta_derivative
-            if (i%(self.iters/10) == 0):
-                print("Cost is:", cost)
+def my_train_test_split(X,y, train_size=0.3):
+    sep = int(len(X) * train_size)
+    X_train, X_test = X[:sep], X[sep:]
+    y_train, y_test = y[:sep], y[sep:]
+    return X_train, X_test, y_train, y_test
+
+def r2_score(y_true, y_pred):
+    mean_y_true = np.mean(y_true)
+    ssTOT = np.sum((y_true - mean_y_true) ** 2)
+    ssRES = np.sum((y_true - y_pred) ** 2)
+    r2 = 1 - (ssRES / ssTOT)
+    return r2
 
 
-'''
-df = pd.read_csv('../train_data.csv')
-train = df.drop(['Unnamed: 0','Id'], axis=1)
-train = train.values
-X = train[:,:-1]
-y = train[:,-1].reshape(train.shape[0], 1)
+df = pd.read_csv("datasets/50_Startups.csv")
+df = df.sample(frac=1, random_state=42).reset_index(drop=True)
+X, y = preprocess_dataframe(df)
+X_train, X_test, y_train, y_test = my_train_test_split(X,y)
+np.set_printoptions(precision=2, suppress=True)
 
-clf = MultilinearRegression()
-clf.fit(X,y)
-'''
+model = LinearRegression()
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+r2 = r2_score(y_true=y_test, y_pred=y_pred)
+print("Coefficient of Determination (R²):", r2)
 
-#gradient_descent_visualization()
-'''
-X = np.array([1, 2, 3, 4, 5])
-y = np.array([2, 4, 5, 4, 5])
-
-clf = LinearRegression()
-clf.fit(X,y)
-y_pred = clf.predict(X.reshape(np.size(X), -1))
-print(y_pred)
-'''
-
-# Polynomial Regression
-X = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-y = np.array([45000, 50000, 60000, 80000, 110000, 150000, 200000, 300000, 500000, 1000000])
-X = X.reshape(-1, 1)
-y = y.reshape(-1, 1)
-
-clf = PolynomialRegression(degree=4)
-costs = clf.fit(X,y)
-print(clf.predict(X.reshape(np.size(X), 1)))
-
-plt.plot(np.arange(0,10000), costs)
-plt.show()
-
-plt.scatter(X,y, c="red")
-plt.plot(X, clf.predict(X.reshape(np.size(X), 1)))
-plt.show()
+from sklearn.linear_model import LinearRegression as LR
+sklearn_model = LR()
+sklearn_model.fit(X_train, y_train)
+y_pred = sklearn_model.predict(X_test)
+r2 = r2_score(y_true=y_test, y_pred=y_pred)
+print("Coefficient of Determination (R²):", r2)
